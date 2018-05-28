@@ -1,0 +1,33 @@
+*******************************************************************************
+Version 1.0.2 
+=====================================
+11/27. Fix a bug of calling ReleaseDC function when creating memory DC.
+    * src/view.cpp
+
+11/27. Fix a bug of the invalid width or height of mEagle Control.
+    * src/view.cpp
+
+Version 1.0.1 (2006-12-1 ~ 2007-10-31)
+=====================================
+07/03 Fix meg format for arm platform.
+	* src/blockset.cpp
+	* src/geometry.cpp
+	* src/geommulit.cpp
+	* src/line.cpp
+	* src/map.cpp
+	* src/map.h
+	* src/mapfeature.cpp
+	* src/maplayer.cpp
+	* src/point.cpp
+	* src/polygon.cpp
+
+Version 1.0.0 (2006-07-1 ~ 2006-11-30)
+=======================================
+11/30. Release as version 1.0.0.
+    * This is the first release version.
+
+11/29. Fix a display bug of radio button in path tracing demo dialog.
+    * test/meagle_path.c
+
+11/28. Create CVS tag rel-1-0.
+

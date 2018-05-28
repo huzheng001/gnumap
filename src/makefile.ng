@@ -1,0 +1,11 @@
+TOP_DIR=..
+include Makefile.am
+AM_CFLAGS = $(INCLUDES)
+
+LIB_NAME = libmeagle
+LIBA = a
+SRC_FILES = $(libmeagle_la_SOURCES)
+
+include ../rules.make
+install::
+	$(CP) $(LIB_NAME).$(LIBA) $(prefix)\lib\$(LIB_NAME).$(LIBA)

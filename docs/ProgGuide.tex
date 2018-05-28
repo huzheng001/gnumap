@@ -1,0 +1,820 @@
+\documentclass[a4paper]{article}
+
+
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{listinggray}{gray}{0.9}
+
+\lstloadlanguages{C,C++}
+\lstset{language=C,tabsize=4, keepspaces=true,
+    %backgroundcolor=\color{listinggray},
+    frame=single,
+    numbers = none,
+    breakindent=22pt, 
+    basicstyle=\footnotesize, 
+    showspaces=false,
+    flexiblecolumns=true, 
+    breaklines=true, breakautoindent=true,breakindent=4em,
+    escapeinside={/*@}{@*/}}
+
+\usepackage{times}
+\usepackage{array}
+\usepackage{fancyhdr}
+%\usepackage{appendix}
+
+\title{mEagle Programming Guide}
+\author{Feynman}
+
+\begin{document}
+
+%build head & foot
+\pagestyle{fancy}
+\lhead{}
+\chead{mEagle Programming Guide}
+\rhead{}
+
+%build title
+\maketitle
+
+\newpage
+
+%build content
+\tableofcontents
+
+\newpage
+
+% This is a comment.
+
+\section{Introduction}
+This chapter will introduce mEagle and organization of this guide. 
+\subsection{About mEagle}
+MEagle is a geography information system for embedded system, which is developed by Feynman Software. mEagle is based on MiniGUI embedded graphics middleware, so it is able to run on more than 10 embedded OSes which MiniGUI supported.\\ \\
+In view of the common application of geographic information system in embedded devices, for example, electronic map operations (roam, zoom, rotation), GPS positioning, path tracking, and so on, Feynman Software has carried on a careful optimized design to mEagle, and makes it have a fast speed, low resource consumption. \\ \\
+The main features of mEagle: 
+\begin{itemize}
+\item Based on MiniGUI graphics library, it is suitable for all kinds of embedded systems, and it has good portability, as well as fast running speed.
+\item Mainly support for MapInfo, ArcInfo and other popular map formats to meet the requirements of different users.
+\item Support for common GIS functions, including map navigation, zoom, distance measurement, map rotation, and so on.
+\item Support for eagle eye function. 
+\item Support for keyword search and regional search for map information, and it can locate the searching result as well. 
+\item Support for the map coordinate data processing function, and it can be integrated with GPS module to provide GPS navigation and location functions.
+\end{itemize}
+ 
+\subsection{Organization of this Guide}
+This text is divided into four chapters:
+\begin{itemize}
+\item Chapter one: Introduce mEagle and describes the organization of this guide.
+\item Chapter two: Give an example for programming with mEagle to help developer start quickly.
+\item Chapter three: Describe the use of two controls provided by mEagle: meagle and meagleeye.
+\item Chapter four: Describe all messages of the two controls.
+\end{itemize} 
+
+
+\newpage
+
+% A Simple Example.
+
+\section{Getting Started}
+This chapter will give a simple program to describe how to develop applictions with mEagle.
+\subsection{A Simpel Program}
+The quickest approach to understand the programming method of mEagle is to analyze a simple program. Listing 1 shows a program loading and displaying map,which will be discussed in detail. \\
+\begin{lstlisting}[frame=trbl,caption=A Simple Program]
+/*MiniGUI header file.*/
+#include <minigui/common.h>
+#include <minigui/minigui.h>
+#include <minigui/gdi.h>
+#include <minigui/window.h>
+#include <minigui/control.h>
+
+/*mEagle header file.*/
+#include "meagle.h"
+
+#define IDC_MEVIEW      101
+#define IDC_MEEYEVIEW   102
+
+/*Handle of meagle cotrol.*/
+HWND meagle_hwnd;
+
+/*Handle of meagle eye control.*/
+HWND meagleeye_hwnd;
+
+static int mEagleProc(HWND hWnd, int message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message) 
+    {
+        case MSG_CREATE:
+
+            char **layers_name = NULL;
+
+            /*Create a mEagle control class instance. */
+            meagle_hwnd = CreateWindow (MEAGLE_CTRL, ``'', WS_VISIBLE, 
+                                    IDC_MEVIEW, 0, 0, 600, 480, hWnd, 0); 
+
+            /*Create a mEagle Eye control class instance.*/
+            meagleeye_hwnd = CreateWindow (MEAGLEEYE_CTRL, ``'', WS_VISIBLE, 
+                                    IDC_MEEYEVIEW, 600, 480, 150, 150, hWnd, 0);
+
+            /*Open a data source.*/
+            SendMessage(meagle_hwnd, ME_OPEN_MAP, 0, (LPARAM)``./res/map'');
+
+            /*Get layer names*/
+            SendMessage(meagle_hwnd, ME_GET_MAPINFO, 0, (LPARAM)&layers_name);
+
+            /*Load map layers which are specified by layers_name.*/
+            SendMessage(meagle_hwnd, ME_LOAD_MAP, 0, (LPARAM)layers_name);
+
+            /*Add eagle eye window*/
+            SendMessage(meagleeye_hwnd, ME_ADD_EYE, 0, meagle_hwnd);
+
+            /*Set current operating state to be panning*/
+            SendMessage (meagle_hwnd, ME_CHANGE_TOOL, ME_STATUS_DRAG, 0);
+
+            if(layers_name)
+                free(layers_name);
+            break;
+
+        case MSG_DESTROY:
+
+            /*Close map.*/
+            SendMessage(meagle_hwnd, ME_CLOSE_MAP, 0, 0);
+
+            DestroyAllControls (hWnd);
+            return 0;
+
+        case MSG_CLOSE:
+
+            DestroyMainWindow (hWnd);
+            PostQuitMessage (hWnd);
+            return 0;
+    }
+    return DefaultMainWinProc(hWnd, message, wParam, lParam);
+}
+
+int MiniGUIMain (int args, const char* argv[])
+{
+    MSG Msg;
+    HWND hMainWnd;  
+
+    MAINWINCREATE CreateInfo;
+
+    /*register meagle control class*/
+    RegisterMEagleControl ();
+
+    /*register meagle eye control class*/
+    RegisterMEagleEyeControl ();
+
+    CreateInfo.dwStyle = WS_VISIBLE | WS_BORDER;
+    CreateInfo.dwExStyle = WS_EX_NONE;
+    CreateInfo.spCaption = "mEagle";
+    CreateInfo.hMenu = 0;
+    CreateInfo.hCursor = GetSystemCursor(0);
+    CreateInfo.hIcon = 0;
+    CreateInfo.MainWindowProc = mEagleProc;
+    CreateInfo.lx = 0;
+    CreateInfo.ty = 0;
+    CreateInfo.rx = 750;
+    CreateInfo.by = 630;
+    CreateInfo.iBkColor = COLOR_lightwhite;
+    CreateInfo.dwAddData = 0;
+    CreateInfo.hHosting = HWND_DESKTOP;
+
+    hMainWnd = CreateMainWindow (&CreateInfo);
+
+    if (hMainWnd == HWND_INVALID)
+        return -1;
+
+    ShowWindow(hMainWnd, SW_SHOWNORMAL);
+    SetWindowBkColor (hMainWnd, RGB2Pixel (HDC_SCREEN, 230, 246, 255));
+    InvalidateRect (hMainWnd, NULL, TRUE);
+
+    while (GetMessage(&Msg, hMainWnd)) {
+        TranslateMessage(&Msg);
+        DispatchMessage(&Msg);
+    }
+
+    /*Unregister meagle control class*/
+    UnregisterMEagleControl ();
+
+    /*Unregister meagle eye control class.*/
+    UnregisterMEagleEyeControl ();
+
+    MainWindowThreadCleanup (hMainWnd);
+
+    return 0;
+
+}
+\end{lstlisting} 
+
+\subsection{Header file}
+The header file included in beginning of the simple program, namely meagle.h, should be included for all applictions with mEagle control. The header file includes definitions of data types, structure, messages and interfaces of meagle and meagleeye control.
+
+\subsection{Register Control class}
+\begin{lstlisting}
+RegisterMEagleControl ();
+RegisterMEagleEyeControl ();
+\end{lstlisting}
+Each control of MiniGUI is an instance of a certain control class. Before creating an control instance, you must first register control class. RegisterMEagleControl and RegisterMEagleEyeControl are functions to register meagle control class and meagleeye control class.
+
+\subsection{Create Control Instance}
+\begin{lstlisting}
+meagle_hwnd = CreateWindow (MEAGLE_CTRL,``'',WS_VISIBLE,IDC_MEVIEW,30, 0, mectlw, mectlh, hWnd, 0); 
+meagleeye_hwnd = CreateWindow (MEAGLEEYE_CTRL,``'',WS_VISIBLE,IDC_MEEYEVIEW,600, 370, 150, 150, hWnd, 0);
+\end{lstlisting}
+In MiniGUI,an instance of a certain control class can be created by calling CreateWindow function. It specifies the control class name, the control catption, the control style, the control identifier, and the initial position and size of the control.This function also specifies the parent window of the child window. 
+
+\subsection{Open Data Source}
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_OPEN_MAP, 0, (LPARAM)``./res/map'');
+\end{lstlisting}
+After meagle control instance and meagleeye control instance are created, you can send messages to them ,which is message driven, to make a lot of mapping operation such as loading, zooming, panning, rotating,etc. A lot of messages are defined for the two controls. They will be detailed in chapter 4.  When meagle control receives message ME\_OPEN\_MAP, it will open a data source which is specified by lParam parameter.  
+
+\subsection{Get Layer Name}
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_GET_MAPINFO, 0, (LPARAM)&layers_name);
+\end{lstlisting}
+After meagle control open a data source, you should get all layer names of the datasource. You can send message ME\_GET\_MAPINFO to meagle control  and the returned names are stored in parameter lParam. 
+
+\subsection{Load Map}
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_LOAD_MAP, 0, (LPARAM)layers_name);
+\end{lstlisting}
+With all layer names, the map can be loaded and displayed when meagle control receives message ME\_LOAD\_MAP. 
+
+\subsection{Change Operating Status}
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_CHANGE_TOOL, ME_STATUS_DRAG, 0);
+\end{lstlisting}
+Mapping operation meagle control supports is specified by operating status such as pan, zoom, rotate, etc.  You can set current status by sending message ME\_CHANGE\_TOOL to meagle control. The parameter wParam specifies the new status.
+
+\subsection{Add Eye}
+\begin{lstlisting}
+SendMessage(meagleeye_hwnd, ME_ADD_EYE, 0, meagle_hwnd);
+\end{lstlisting}
+In order to make meagleeye take effect, message ME\_ADD\_EYE should be sent to meagleeye control and parameter lParam specifies handle of meagle control.
+
+
+\subsection{Close Map}
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_CLOSE_MAP, 0, 0);
+\end{lstlisting}
+When meagle control receives message ME\_CLOSE\_MAP, it will unload the map.
+
+\subsection{Unregister Control class}
+\begin{lstlisting}
+UnregisterMEagleControl ();
+UnregisterMEagleEyeControl ();
+\end{lstlisting}
+When exiting application, you must unregister control class. UnregisterMEagleControl function and UnregisterMEagleEyeControl function  unregister meagle control class and meagleeye control class.
+
+
+\newpage
+
+
+
+\section{mEagle controls}
+There are two predefined controls in mEagle,including meagle and meagleeye. They are the main elements for mapping operation. Table 1 1ists the predefined control classes and the corresponding classs names in mEagle. This chapter will describe in detail the predefined control classes in mEagle. 
+\begin{table}[h]
+\centering
+\caption{mEagle controls}
+\begin{tabular}{lll}
+\hline
+Control Class  & Class Name    & C Macro for Control Name \\[5pt] \hline
+meagle         & meagle    & MEAGLE\_CTRL \\ 
+eye            & meagleeye & MEAGLEEYE\_CTRL  \\ \hline
+\end{tabular}
+\end{table}
+
+
+\subsection{meagle}
+Meagle control is a MiniGUI control which provides a lot of mapping functionality including loading, panning, zooming, rotating, distance measurement, searching,etc. With meagle control, developers can develop self GIS or GPS navagation application easily and quickly.  \\ \\
+To develop application with mEagle control, you should first register a control class with function RegisterMEagleControl.It returns TRUE if success, otherwise return FALSE. 
+\begin{lstlisting}
+BOOL RegisterMEagleControl (void)
+\end{lstlisting} 
+
+Secondly you should create an instance of meagle control class with function CreateWindow.
+\begin{lstlisting}
+meagle_hwnd = CreateWindow (MEAGLE_CTRL, ``'',WS_VISIBLE, IDC_MEVIEW, 0, 0, 200, 200, hWnd, 0);  
+\end{lstlisting}
+The function specifies the control class, the control caption, the control style, the control identifier, the initial position, size of the control and the parent window of the child window. \\ \\
+When exiting the application, you should unregister control class with function UnregisterMEagleControl.
+\begin{lstlisting}
+void UnregisterMEagleControl (void)
+\end{lstlisting}  
+Meagle control provides a lot of mapping functionality which  is message driven. By sending messages to meagle control,  you can drive the control to operate the map. Table 2 lists all messages of meagle control. 
+\begin{table}
+\centering
+\caption{Messages of meagle}
+\begin{tabular}{ll}
+\hline
+Message  & Notes \\[5pt] \hline
+ME\_OPEN\_MAP & Open a data source \\ 
+ME\_GET\_MAPINFO  & Get all layer name  \\ 
+ME\_LOAD\_MAP & Load and display map data. \\ 
+ME\_CLOSE\_MAP & Unload map data. \\ 
+ME\_LOAD\_MEAGLE\_MAP & Load and display MEG map file. \\ 
+ME\_SAVE\_MEAGLE\_MAP & Save map data in RAM to MEG file \\ 
+ME\_CHANGE\_TOOL & Change current operation  \\ 
+ME\_GET\_LAYERCOUNT & Get count of layers. \\ 
+ME\_GET\_LAYERNAME & Get certain layer's name \\ 
+ME\_GET\_LAYERVISIBLE & Decide whether certain layer is visible.  \\ 
+ME\_CHANGE\_LAYERINDEX & Change certain layer's index. \\ 
+ME\_CHANGE\_LAYERVISIBLE & Make certain layer visible or not. \\ 
+ME\_WIN\_TO\_LL & Convert screen coordinate to geographic coordinate.  \\ 
+ME\_LL\_TO\_WIN & Convert geographic coordinate to screen coordinate.  \\ 
+ME\_REFRESH & Repaint map. \\ 
+ME\_GLOBAL & Zoom map to full extent. \\ 
+ME\_CLEAR & Clear all custom features. \\ 
+ME\_NORTH & North seeking. \\ 
+ME\_SET\_SCALE & Set current scale. \\ 
+ME\_GET\_SCALE & Get current scale. \\ 
+ME\_MOVE\_X & Move map in horizontal direction. \\ 
+ME\_MOVE\_Y & Move map in vertical directon. \\ 
+ME\_ROTATE & Rotate map some angle. \\ 
+ME\_KEY\_SEARCH & Search features on name. \\ 
+ME\_AREA\_SEARCH & Search features on area. \\ 
+ME\_GET\_KEYRESULTCOUNT & Get count of keyword search result. \\ 
+ME\_GET\_KEYRESULTITEM & Get certain item of keyword search result. \\ 
+ME\_GET\_AREARESULTCOUNT & Get count of area search result.\\ 
+ME\_GET\_AREARESULTITEM & Get certain item of area search result. \\ 
+ME\_ADD\_RESULT & Add a custom feature. \\ 
+ME\_REMOVE\_RESULT & Remove certain custom feature. \\ 
+ME\_SETCENTER\_LAT & Set center point. \\ \hline
+\end{tabular}
+\end{table}   
+More details are described in Chapter 4.
+
+\subsection{meagleeye}
+Meagleeye is a MiniGUI control which shows a full extent view of a map. It must be used with map control and can not be used singly.
+To develop application with meagleeye control, you shoud first register a control class with function RegisterMEagleEyeControl. It returns TRUE if success, otherwise return FALSE.
+\begin{lstlisting}
+BOOL RegisterMEagleEyeControl (void)
+\end{lstlisting}
+
+Secondly you should build a meagleeye control class instance with CreateWindow.
+\begin{lstlisting}
+meagleeye_hwnd = CreateWindow (MEAGLEEYE_CTRL,``'',WS_VISIBLE,IDC_MEEYEVIEW,600, 370, 150, 150, hWnd, 0);
+\end{lstlisting} 
+When exiting the application, you should unregister the control class with function UnregisterMEagleEyeControl.
+\begin{lstlisting}
+void UnregisterMEagleEyeControl (void)
+\end{lstlisting}   
+Meagleeye control is also message driven as meagle control. Table 3 lists all messages of meagleeye control. 
+\begin{table}[h]
+\centering
+\caption{Messages of meagleeye}
+\begin{tabular}{ll}
+\hline
+Message  & Notes \\[5pt] \hline
+ME\_ADD\_EYE & connect eagle eye with map view. \\ 
+ME\_REMOVE\_EYE  & disconnect eagle eye.   \\ 
+ME\_UPDATE\_EYE & Repaint eagle eye. \\ \hline
+\end{tabular}  
+\end{table} \\ \\ 
+More details are described in Chapter 4.
+
+\newpage
+
+\section{Messages}
+This chapter will describe messages of meagle control and meagleeye control in detail. 
+\subsection{Open Map}
+Sending ME\_OPEN\_MAP message to meagle control will open a map file/source data. The parameter lParam is the pointer to the buffer which stores the path of the map or the data source. It should be noted that lParam is a directory name which includes all map layers.  
+\begin{lstlisting}
+char *dir = ``mapdir'';
+SendMessage(meagle_hwnd, ME_OPEN_MAP, 0, (LPARAM)dir);
+\end{lstlisting}
+
+
+\subsection{Load Map}
+Sending ME\_LOAD\_MAP message to meagle control will load and display map. The parameter lParam is the pointer to the buffer which stores all layer names. 
+\begin{lstlisting}
+char **layers = {``river'',``city'',``road''};
+SendMessage(meagle_hwnd, ME_LOAD_MAP, 0, (LPARAM)layers);
+\end{lstlisting}
+
+\subsection{Close Map}
+Sending ME\_CLOSE\_MAP message to meagle control will  unload and close the map.
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_CLOSE_MAP, 0, 0);
+\end{lstlisting}
+
+\subsection{Save Meagle Map}
+Sending ME\_SAVE\_MEAGLE\_MAP message to meagle control will save current map data in RAM to a MEG file with .meg extent whose format is defined by Feynman,Inc.  The parameter lParam is the pointer to the buffer which specifies the MEG file's name. 
+\begin{lstlisting}
+char *file_name = {``beijing.meg''};
+SendMessage(meagle_hwnd, ME_SAVE_MEAGLE_MAP, 0, (LPARAM)file_name);
+\end{lstlisting}
+
+\subsection{Load Meagle MAP}
+Sending ME\_LOAD\_MEAGLE\_MAP message to meagle control will load a MEG file and display the map. The parameter lParam is the pointer to the buffer which stores a MEG file's name. It should be noted that meagle can load MEG file much quicker than MapInfo or ArcInfo file. It is specially used in embedded device.   
+\begin{lstlisting}
+char *file_name = {``beijing.meg''};
+SendMessage(meagle_hwnd, ME_LOAD_MEAGLE_MAP, 0, (LPARAM)file_name);
+\end{lstlisting}
+
+\subsection{Get Map Info}
+Sending ME\_GET\_MAPINFO message to meagle control will get all layer name. The parameter lParam is the pointer to the buffer which receives all layer names. 
+\begin{lstlisting}
+char **layers_name = NULL;
+SendMessage(meagle_hwnd, ME_GET_MAPINFO, 0, (LPARAM)&layers_name);
+\end{lstlisting}
+
+\subsection{Set Layer Font}
+Sending ME\_SET\_LAYERFONT message to meagle control will set font of a layer . The parameter wParam is the pointer to the buffer which stores certain layer's name, and lParam is the pointer to a LOGFONT structure which is a font structure of MiniGUI. More details about LOGFONT are described in  MiniGUI's Program Guide.
+\begin{lstlisting}
+char *layers_name = ``city'';
+LOGFONT *font = CreateLogFont(NULL, "SansSerif", FONT_CHARSET_GB2312_0, FONT_WEIGHT_BOLD, FONT_SLANT_ROMAN, FONT_SETWIDTH_NORMAL, FONT_SPACING_CHARCELL, FONT_UNDERLINE_NONE, FONT_STRUCKOUT_NONE, 8, 0);
+SendMessage(meagle_hwnd, ME_SET_LAYERFONT, (DWORD)layers_name, (DWORD)font);
+\end{lstlisting}
+
+\subsection{Change Tool}
+Sending ME\_CHANGE\_TOOL message to meagle control will change current mapping tool. The parameter wParam specifies new tool. 
+\begin{lstlisting}
+SendMessage (meagle_hwnd, ME_CHANGE_TOOL, ME_STATUS_ZOOMIN, 0);
+\end{lstlisting}
+Most mapping applications provide an assortment of toolbar buttons to aid with common navigation tasks(such as panning). Meagle control provides five built-in mapping tools. Table 4 lists all tools and their C Macro. 
+\begin{table}[h]
+\centering
+\caption{Map Operating Status}
+\begin{tabular}{ll}
+\hline
+C Macro    & Tool \\ \hline
+ME\_STATUS\_DRAG & Pan \\ 
+ME\_STATUS\_ZOOMOUT & Zoom Out \\ 
+ME\_STATUS\_ZOOMIN & Zoom In \\ 
+ME\_STATUS\_ROTATE & Rotate \\ 
+ME\_STATUS\_DISTANCE & Ruler \\ \hline
+\end{tabular}
+\end{table} \\
+\begin{itemize}
+\item Pan: Repositions the map within the window. 
+\item Zoom Out: Gets a wider area view of the map. 
+\item Zoom In: Gets a closer area view of the map.
+\item Rotate: Rotates the map within the window.  
+\item Ruler: Measures distance between two points.
+\end{itemize}
+
+\subsection{Get Layer Count}
+Sending ME\_GET\_LAYERCOUNT message to meagle control will get count of map layers. The parameter lParam receives the number.
+\begin{lstlisting}
+int layer_count = 0;
+SendMessage(meagle_hwnd, ME_GET_LAYERCOUNT, 0, (LPARAM)&layer_count);
+\end{lstlisting}
+
+\subsection{Get Layer Name}
+Sending ME\_GET\_LAYERNAME message to meagle control will get certain layer's name.  The parameter wParam is the index of a layer,  and lParam is the pointer to buffer which receives the name. 
+\begin{lstlisting}
+int index = 0;
+char *layer_name;
+SendMessage(meagle_hwnd, ME_GET_LAYERNAME, index, (LPARAM)&layer_name);
+\end{lstlisting}
+
+\subsection{Get Layer Visible}
+Sending ME\_GET\_LAYERVISIBLE message to meagle control will know  whether certain layer is displayed in the map. The parameter wParam is the index of a layer,  and lParam receives the return value. If the value is 1 ,the layer is visible; otherwise it is unvisible.
+\begin{lstlisting}
+int index = 0;
+int layer_visible;
+SendMessage(meagle_hwnd, ME_GET_LAYERVISIBLE, index, (LPARAM)&layer_visible);
+\end{lstlisting}
+
+\subsection{Change Layer Index}
+Sending ME\_CHANGE\_LAYERINDEX message to meagle control will change certain layer's index which decides sequence of displaying. The parameter wParam is new index of the layer, and lParam is the pointer to buffer which stores the layer's name.
+\begin{lstlisting}
+int index = 2;
+char* layer_name = ``river'';
+SendMessage(meagle_hwnd, ME_CHANGE_LAYERINDEX, index, (LPARAM)layer_name);
+\end{lstlisting}
+
+\subsection{Change Layer Visible}
+Sending ME\_CHANGE\_LAYERVISIBLE message to meagle control will control whether certain layer is displayed in the map.  The parameter wParam is index of the layer,  and lParam controls whether the layer is visible. If 1 ,visible; otherwise, unvisible.
+\begin{lstlisting}
+int index = 0;
+int layer_visible = 1;
+SendMessage(meagle_hwnd, ME_CHANGE_LAYERVISIBLE, index, layer_visible);
+\end{lstlisting}
+
+
+\subsection{Screen Coordinate To Geographic Coordinate}
+Sending ME\_WIN\_TO\_LL message to meagle control will convert coordinates of a point from screen coordinate system to geographic coordinate system.  The parameter wParam is a pointer to structure which stores the point's screen coordinate, and lParam is a pointer to the structure which stores converted coordinate.
+\begin{lstlisting}
+POINT point = { 100, 100 };
+DOUBLE_POINT dp;
+SendMessage(meagle_hwnd, ME_WIN_TO_LL, (WPARAM)&point, (LPARAM)&dp);
+\end{lstlisting}
+
+\subsection{Geographic Coordinate  To Screen Coordinate}
+Sending ME\_LL\_TO\_WIN message to meagle control will convert coordinates of a point from geographic coordinate system  to screen coordinate system.  The parameter wParam is a pointer to structure which stores the point's geographic coordinate, and lParam is a pointer to structure which stores converted coordinate.
+\begin{lstlisting}
+DOUBLE_POINT dp = {116.43448,39.92272};
+POINT point;
+SendMessage(meagle_hwnd, ME_LL_TO_WIN, (WPARAM)&dp, (LPARAM)&point);
+\end{lstlisting}
+
+\subsection{Refresh}
+Sending ME\_REFRESH message to meagle control will repaint the map. 
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_REFRESH, 0, 0);
+\end{lstlisting}
+
+\subsection{Global}
+Sending ME\_GLOBAL message to meagle control will zoom map to full extent. 
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_GLOBAL, 0, 0);
+\end{lstlisting}
+
+
+\subsection{Clear}
+Sending ME\_CLEAR message to meagle control will clear all custom features such as search result, measuring line, etc. 
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_CLEAR, 0, 0);
+\end{lstlisting}
+
+\subsection{North Seeking}
+Sending ME\_NORTH message to meagle control will seek north and rotate the map to it.
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_NORTH, 0, 0);
+\end{lstlisting}
+
+\subsection{Set Scale}
+Sending ME\_SET\_SCALE message to meagle control will set current scale to be a new one.  The parameter lParam is the new scale to be set. If the new scale is larger than the old one, the map will zoom in; otherwise zoom out.
+\begin{lstlisting}
+double pixel_length;
+SendMessage(hwnd, ME_SET_SCALE, 0, (DWORD)(&pixel_length));
+\end{lstlisting}
+
+\subsection{Get Scale}
+Sending ME\_GET\_SCALE message to meagle control will get current scale.
+\begin{lstlisting}
+double pixel_length;
+SendMessage(hwnd, ME_GET_SCALE, 0, (DWORD)(&pixel_length));
+\end{lstlisting}
+
+\subsection{Move X}
+Sending ME\_MOVE\_X message to meagle control will move map in horizontal direction. The parameter wParam specifies the coordinate system such as ME\_COORDINATE\_WIN ,ME\_COORDINATE\_LAT, and lParam is the offset to move. If parameter lparam is larger than zero, the map will be moved leftwards, otherwise it will be moved rightwards. 
+\begin{lstlisting}
+SendMessage (meagle_hwnd, ME_MOVE_X, ME_COORDINATE_WIN, (LPARAM)-300);
+\end{lstlisting}
+
+\subsection{Move Y}
+Sending ME\_MOVE\_Y message to meagle control will move map in vertical direction. If parameter lparam is larger than zero, the map will be moved downwards, otherwise it will be moved upwards.   
+\begin{lstlisting}
+SendMessage (meagle_hwnd, ME_MOVE_Y, ME_COORDINATE_WIN, (LPARAM)-300);
+\end{lstlisting}
+
+\subsection{Rotate}
+Sending ME\_ROTATE message to meagle control will rotate map some angle.  The parameter lParam is the radian to rotate.
+\begin{lstlisting}
+#define G_PI    3.14159265358979323846E0
+alpha = -G_PI/8;
+SendMessage (meagle_hwnd, ME_ROTATE, 0, (LPARAM)&alpha);
+\end{lstlisting}
+
+\subsection{Key Search}
+Sending ME\_KEY\_SEARCH message to meagle control will search a feature according to the feature name. The parameter lParameter is a pointer to the buffer which stores the name.
+\begin{lstlisting}
+char keyinfo[256] = ``NewYork'';
+SendMessage (meagle_hwnd, ME_KEY_SEARCH, 0, (LPARAM)keyinfo);
+\end{lstlisting}
+
+\subsection{Area Search}
+Sending ME\_AREA\_SEARCH message to meagle control will search all features in a circle area in the map. The parameter lParam is a pointer to AREA\_SEARCH structure which includes the center and radius of the circle area. More details about AREA\_SEARCH will be described in Section A.
+\begin{lstlisting}
+AREA_SEARCH area_search;
+area_search.latitude = dp.x;
+area_search.longitude = dp.y;
+area_search.distance = 200;
+SendMessage(meagle_hwnd, ME_AREA_SEARCH, 0, (LPARAM)&area_search);
+\end{lstlisting}
+
+\subsection{Get Key Result Count}
+Sending ME\_GET\_KEYRESULTCOUNT message to meagle control will get count of features which are found according to feature name.
+\begin{lstlisting}
+int result_count;
+result_count = SendMessage(meagle_hwnd, ME_GET_KEYRESULTCOUNT, 0, 0);
+\end{lstlisting}
+
+\subsection{Get Key Result Item}
+Sending ME\_GET\_KEYRESULTITEM message to meagle control will get a feature which is found according to feature name. The parameter wPara is result index, and lParam is a pointer to a RESULT structure which includes a feature's information such as  id, name, geometry type, color, coordinate, label, etc. More details about RESULT are described in Appendex A.
+\begin{lstlisting}
+RESULT result;
+int index = 1;
+SendMessage(meagle_hwnd, ME_GET_KEYRESULTITEM, index, (LPARAM)&result);
+\end{lstlisting}
+
+
+\subsection{Get Area Result Count}
+Sending ME\_GET\_AREARESULTCOUNT message to meagle control will get count of features which are found in an circle area.
+\begin{lstlisting}
+result_count = SendMessage(meagle_hwnd, ME_GET_AREARESULTCOUNT, 0, 0);
+\end{lstlisting}
+
+\subsection{Get Area Result Item}
+Sending ME\_GET\_AREARESULTITEM message to meagle control will get a feature which is found in a circle area. The parameter wParam is result index, and lParam is a pointer to RESULT structure.
+\begin{lstlisting}
+RESULT result;
+int index = 1;
+SendMessage(meagle_hwnd, ME_GET_AREARESULTITEM, index, (LPARAM)&result);
+\end{lstlisting}
+
+
+\subsection{Add Result}
+Sending ME\_ADD\_RESULT message to meagle control will add a custom feature in meagle control. The parameter wParam is the custom result's index, and lParam is a pointer to RESULT structure. 
+\begin{lstlisting}
+int result_id = 1;
+RESULT result;
+result.GEOMDATA.CIRCLE.ll.latitude = dp.x;
+result.GEOMDATA.CIRCLE.ll.longitude = dp.y;
+result.GEOMDATA.CIRCLE.color = color;
+result.GEOMDATA.CIRCLE.size = size;
+result.feature_name = name;
+result.geom_type = CIRCLEFILLED;
+SendMessage(meagle_hwnd, ME_ADD_RESULT, (WPARAM)&result_id, (LPARAM) &result);
+\end{lstlisting}
+
+\subsection{Remove Result}
+Sending ME\_REMOVE\_RESULT message to meagle control will romove a custom feature in meagle control. The parameter lParam is the index of the result to be removed. 
+\begin{lstlisting}
+int result_id = 1;
+ SendMessage(meagle_hwnd, ME_REMOVE_RESULT, 0, (LPARAM)result_id);
+\end{lstlisting}
+
+\subsection{Set Center Lat}
+Sending ME\_SETCENTER\_LAT message to meagle control will set the point which will be displayed in the center of meagle control window. The parameter wParam is the longitude of the point, and lParam is the latitude of the point.
+\begin{lstlisting}
+DOUBLE_POINT dp = {116.43448,39.92272};
+sendMessage(meagle_hwnd, ME_SETCENTER_LAT,(DWORD)&dp.x, (LPARAM)&dp.y);
+\end{lstlisting}
+
+
+\subsection{Add Eye}
+After creating meagleeye control, you should send ME\_ADD\_EYE message to meagleeye control to connect it with a meagle control. The parameter lParam is the handle of meagle control. 
+\begin{lstlisting}
+SendMessage(meagleeye_hwnd, ME_ADD_EYE, 0, (LPARAM)meagle_hwnd);
+\end{lstlisting}
+
+\subsection{Update Eye}
+Sending ME\_UPDATE\_EYE message to meagleeye control will repaint it.
+\begin{lstlisting}
+SendMessage(meagle_hwnd, ME_UPDATE_EYE, 0, 0);
+\end{lstlisting}
+
+\subsection{Remove Eye}
+Sending ME\_REMOVE\_EYE message to meagleeye control will disconnect it with meagle cotrol.
+\begin{lstlisting}
+SendMessage(meagleeye_hwnd, ME_REMOVE_EYE, 0, 0);
+\end{lstlisting}
+
+\newpage
+
+\begin{appendix}
+
+\section{Data Structure}
+
+\subsection{DOUBLE\_POINT}
+\begin{lstlisting}
+typedef struct _DoublePoint
+{
+    double x;
+    double y;
+} DOUBLE_POINT;
+\end{lstlisting}
+
+\subsection{KEYWORD\_SEARCH}
+\begin{lstlisting}
+typedef struct _KEYWORD_SEARCH
+{
+    double latitude;
+    double longitude;
+    char* feature_name;
+}KEYWORD_SEARCH;
+\end{lstlisting}
+
+\subsection{AREA\_SEARCH}
+\begin{lstlisting}
+typedef struct _AREA_SEARCH
+{
+    double latitude;
+    double longitude;
+    int distance;
+}AREA_SEARCH;
+\end{lstlisting}
+
+
+\subsection{RESULT}
+\begin{lstlisting}
+typedef struct _RESULT
+{
+    long id;
+    const char* feature_name;
+    int geom_type;
+    union _GEOMDATA
+    {
+        struct _CIRCLE
+        {
+            int size;
+            char* color;
+            int isll;
+            union {
+                struct {
+                    double latitude;
+                    double longitude;
+                } ll;
+                struct {
+                    int x;
+                    int y;
+                } win;
+            };
+        }CIRCLE;
+
+        struct _PICTURE
+        {
+            int width;
+            int height;
+
+            PBITMAP pBitmap;
+            int isll;
+            union{
+                struct{
+                    double latitude;
+                    double longitude;
+                }ll;
+                struct {
+                    int x;
+                    int y;
+                }win;
+            };
+        }PICTURE;
+
+        struct _LINES
+        {
+            int width;
+            char* color;
+            int num;
+             DOUBLE_POINT* points;
+        }LINES;
+
+        struct _BIGCIRCLE
+        {
+            double r;
+            int pen_width;
+            char* color;
+            double latitude;
+            double longitude;
+        }BIGCIRCLE;
+    }GEOMDATA;
+}RESULT;
+\end{lstlisting}
+
+\newpage
+
+\section{Messages Definition}
+\begin{verbatim}
+enum
+{
+    ME_END_KEYSEARCH,
+    ME_LOAD_MEAGLE_MAP,
+    ME_SAVE_MEAGLE_MAP,
+    ME_OPEN_MAP,
+    ME_GET_MAPINFO,
+    ME_LOAD_MAP,
+    ME_CLOSE_MAP,
+    ME_CHANGE_TOOL,
+    ME_GET_LAYERCOUNT,
+    ME_GET_LAYERNAME,
+    ME_GET_LAYERVISIBLE,
+    ME_SET_LAYERFONT,
+    
+    ME_CHANGE_LAYERINDEX,
+    ME_CHANGE_LAYERVISIBLE,
+    ME_ADD_EYE,
+    ME_REMOVE_EYE,
+    ME_UPDATE_EYE,
+
+    ME_WIN_TO_LL,
+    ME_LL_TO_WIN,
+
+    ME_REFRESH,
+    ME_GLOBAL,
+    ME_CLEAR,
+    ME_NORTH,
+    ME_SET_SCALE,
+    ME_GET_SCALE,
+    ME_MOVE_X,
+    ME_MOVE_Y,
+    ME_ROTATE,
+    ME_KEY_SEARCH,
+    ME_AREA_SEARCH,
+    ME_GET_KEYRESULTCOUNT,
+    ME_GET_KEYRESULTITEM,
+    ME_GET_AREARESULTCOUNT,
+    ME_GET_AREARESULTITEM,
+    ME_ADD_RESULT,
+    ME_REMOVE_RESULT,
+    ME_SETCENTER_LAT,
+};
+\end{verbatim}
+
+\end{appendix}
+
+\end{document}
